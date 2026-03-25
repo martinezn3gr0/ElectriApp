@@ -1,0 +1,91 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Information about electricians and clients.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "photoURL": { "type": "string", "format": "uri" },
+        "role": { "type": "string", "enum": ["electrician", "client"] },
+        "bio": { "type": "string" },
+        "skills": { "type": "array", "items": { "type": "string" } },
+        "certifications": { "type": "array", "items": { "type": "string" } },
+        "location": { "type": "string" },
+        "rating": { "type": "number" },
+        "reviewCount": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "acceptedTerms": { "type": "boolean" },
+        "acceptedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role", "acceptedTerms", "acceptedAt"]
+    },
+    "Project": {
+      "title": "Project Lead",
+      "description": "A job opportunity posted by a client.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "budget": { "type": "number" },
+        "location": { "type": "string" },
+        "status": { "type": "string", "enum": ["open", "in-progress", "completed", "cancelled"] },
+        "clientId": { "type": "string" },
+        "electricianId": { "type": "string" },
+        "category": { "type": "string", "enum": ["residential", "commercial", "industrial", "emergency"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "description", "clientId", "status"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "Client feedback for an electrician.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "projectId": { "type": "string" },
+        "clientId": { "type": "string" },
+        "electricianId": { "type": "string" },
+        "rating": { "type": "number" },
+        "comment": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["projectId", "clientId", "electricianId", "rating"]
+    },
+    "Message": {
+      "title": "Chat Message",
+      "description": "Communication between client and electrician.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "projectId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "receiverId": { "type": "string" },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["projectId", "senderId", "receiverId", "text"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/projects/{projectId}": {
+      "schema": "Project",
+      "description": "Project listings"
+    },
+    "/reviews/{reviewId}": {
+      "schema": "Review",
+      "description": "Project reviews"
+    },
+    "/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Direct messages"
+    }
+  }
+}

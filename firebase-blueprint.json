@@ -13,6 +13,8 @@
         "bio": { "type": "string" },
         "skills": { "type": "array", "items": { "type": "string" } },
         "certifications": { "type": "array", "items": { "type": "string" } },
+        "availability": { "type": "string", "enum": ["available", "busy", "offline"] },
+        "yearsOfExperience": { "type": "integer" },
         "location": { "type": "string" },
         "rating": { "type": "number" },
         "reviewCount": { "type": "integer" },

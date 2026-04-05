@@ -1,27 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Zap, 
-  Search, 
-  Plus, 
-  User, 
-  LogOut, 
-  Briefcase, 
-  CheckCircle, 
-  Clock, 
-  MapPin, 
+  PlugZap, 
+  ScanSearch, 
+  PlusCircle, 
+  UserCircle, 
+  Power, 
+  HardHat, 
+  BadgeCheck, 
+  Timer, 
+  Navigation, 
   DollarSign, 
   Star, 
-  Shield, 
-  TrendingUp, 
-  Award,
+  ShieldCheck, 
+  Activity, 
+  Trophy,
   Menu,
   X,
   ChevronRight,
-  ArrowRight,
-  MessageSquare,
-  Send,
-  HelpCircle,
-  RefreshCw
+  MoveRight,
+  MessageSquareText,
+  SendHorizontal,
+  CircleHelp,
+  RotateCw,
+  Facebook
 } from 'lucide-react';
 import { 
   signInWithPopup, 
@@ -43,24 +44,82 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
 
-import { auth, db, googleProvider } from './firebase';
+import { auth, db, googleProvider, facebookProvider } from './firebase';
 import { FirebaseProvider, useAuth, handleFirestoreError, OperationType, ErrorBoundary } from './components/FirebaseProvider';
 import { UserProfile, Project, ProjectStatus, ProjectCategory, UserRole, Review, Message } from './types';
 import { cn } from './lib/utils';
 
 // --- Components ---
 
-const Navbar = ({ onHelp }: { onHelp?: () => void }) => {
-  const { user, profile, loading } = useAuth();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-  const handleLogin = async () => {
+const LoginModal = ({ onClose }: { onClose: () => void }) => {
+  const handleOAuthLogin = async (provider: any) => {
     try {
-      await signInWithPopup(auth, googleProvider);
+      await signInWithPopup(auth, provider);
+      onClose();
     } catch (error) {
       console.error("Login failed:", error);
     }
   };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-black/90 backdrop-blur-md"
+      />
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="relative w-full max-w-md bg-zinc-900 rounded-[2.5rem] border border-white/10 p-10 shadow-2xl"
+      >
+        <div className="absolute top-0 right-0 p-8">
+          <button onClick={onClose} className="p-2 text-white/40 hover:text-white bg-white/5 rounded-full transition-colors">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <div className="mb-10 text-center">
+          <div className="w-16 h-16 bg-blue-600 rounded-3xl flex items-center justify-center mb-6 mx-auto shadow-xl shadow-blue-600/20">
+            <UserCircle className="w-8 h-8 text-white" />
+          </div>
+          <h2 className="text-3xl font-black text-white tracking-tighter mb-2 uppercase italic">Iniciar Sesión</h2>
+          <p className="text-white/50">Elige tu plataforma preferida</p>
+        </div>
+
+        <div className="space-y-4">
+          <button 
+            onClick={() => handleOAuthLogin(googleProvider)}
+            className="w-full py-4 bg-white text-black font-black rounded-2xl hover:bg-blue-600 hover:text-white transition-all flex items-center justify-center gap-3"
+          >
+            <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="" />
+            CONTINUAR CON GOOGLE
+          </button>
+          
+          <button 
+            onClick={() => handleOAuthLogin(facebookProvider)}
+            className="w-full py-4 bg-[#1877F2] text-white font-black rounded-2xl hover:bg-[#166fe5] transition-all border border-white/10 flex items-center justify-center gap-3"
+          >
+            <Facebook className="w-5 h-5 fill-white" />
+            CONTINUAR CON FACEBOOK
+          </button>
+        </div>
+
+        <p className="mt-8 text-center text-xs text-white/30 font-medium">
+          Al iniciar sesión, aceptas nuestros <br />
+          <span className="text-blue-600">Términos de Servicio</span> y <span className="text-blue-600">Privacidad</span>.
+        </p>
+      </motion.div>
+    </div>
+  );
+};
+
+const Navbar = ({ onHelp, onLogin }: { onHelp?: () => void, onLogin?: () => void }) => {
+  const { user, profile, loading } = useAuth();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -76,7 +135,7 @@ const Navbar = ({ onHelp }: { onHelp?: () => void }) => {
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Zap className="w-5 h-5 text-white fill-white" />
+              <PlugZap className="w-5 h-5 text-white fill-white" />
             </div>
             <span className="text-xl font-bold tracking-tighter text-white">ElectriApp</span>
           </div>
@@ -88,7 +147,7 @@ const Navbar = ({ onHelp }: { onHelp?: () => void }) => {
               onClick={onHelp}
               className="text-sm font-medium text-white/70 hover:text-white transition-colors flex items-center gap-1"
             >
-              <HelpCircle className="w-4 h-4" /> Ayuda
+              <CircleHelp className="w-4 h-4" /> Ayuda
             </button>
           </div>
 
@@ -105,12 +164,12 @@ const Navbar = ({ onHelp }: { onHelp?: () => void }) => {
                   onClick={handleLogout}
                   className="p-2 text-white/70 hover:text-white hover:bg-white/10 rounded-full transition-all"
                 >
-                  <LogOut className="w-5 h-5" />
+                  <Power className="w-5 h-5" />
                 </button>
               </div>
             ) : (
               <button 
-                onClick={handleLogin}
+                onClick={onLogin}
                 className="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-full hover:bg-blue-500 transition-all"
               >
                 Iniciar sesión
@@ -145,7 +204,7 @@ const Navbar = ({ onHelp }: { onHelp?: () => void }) => {
             </button>
             {!user && (
               <button 
-                onClick={handleLogin}
+                onClick={onLogin}
                 className="w-full py-3 bg-blue-600 text-white font-bold rounded-xl"
               >
                 Iniciar sesión
@@ -182,7 +241,7 @@ const HelpCenter = ({ onClose }: { onClose: () => void }) => {
 
         <div className="mb-10">
           <div className="w-16 h-16 bg-blue-600 rounded-3xl flex items-center justify-center mb-6 shadow-xl shadow-blue-600/20">
-            <HelpCircle className="w-8 h-8 text-white" />
+            <CircleHelp className="w-8 h-8 text-white" />
           </div>
           <h2 className="text-4xl font-black text-white tracking-tighter mb-2 uppercase italic">Centro de Ayuda</h2>
           <p className="text-white/50 text-lg">¿Cómo podemos ayudarte hoy?</p>
@@ -193,25 +252,25 @@ const HelpCenter = ({ onClose }: { onClose: () => void }) => {
             { 
               title: "Soy Electricista", 
               desc: "Aprende cómo encontrar proyectos, comunicarte con clientes y recibir pagos.",
-              icon: Zap,
+              icon: PlugZap,
               color: "bg-blue-600"
             },
             { 
               title: "Soy Cliente", 
               desc: "Descubre cómo publicar proyectos, filtrar electricistas y gestionar contratos.",
-              icon: Briefcase,
+              icon: HardHat,
               color: "bg-purple-600"
             },
             { 
               title: "Seguridad y Pagos", 
               desc: "Información sobre nuestras políticas de seguridad y métodos de pago protegidos.",
-              icon: Shield,
+              icon: ShieldCheck,
               color: "bg-green-600"
             },
             { 
               title: "Soporte Técnico", 
               desc: "Contacta con nuestro equipo si tienes problemas con la plataforma.",
-              icon: MessageSquare,
+              icon: MessageSquareText,
               color: "bg-orange-600"
             }
           ].map((item, i) => (
@@ -275,7 +334,7 @@ const Hero = ({ onLogin }: { onLogin: () => void }) => {
               onClick={onLogin}
               className="w-full sm:w-auto px-8 py-4 bg-blue-600 text-white font-black rounded-2xl hover:scale-105 transition-transform flex items-center justify-center gap-2"
             >
-              Buscar proyectos <ArrowRight className="w-5 h-5" />
+              Buscar proyectos <MoveRight className="w-5 h-5" />
             </button>
             <button 
               onClick={onLogin}
@@ -288,9 +347,9 @@ const Hero = ({ onLogin }: { onLogin: () => void }) => {
 
         <div className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
           {[
-            { icon: Shield, title: "Profesionales verificados", desc: "Cada electricista es verificado y cuenta con licencia comprobada." },
-            { icon: TrendingUp, title: "Clientes de alto valor", desc: "Enfócate en proyectos comerciales, industriales y residenciales de gran escala." },
-            { icon: Award, title: "Red de élite", desc: "Únete al 5% superior de contratistas eléctricos en tu región." }
+            { icon: ShieldCheck, title: "Profesionales verificados", desc: "Cada electricista es verificado y cuenta con licencia comprobada." },
+            { icon: Activity, title: "Clientes de alto valor", desc: "Enfócate en proyectos comerciales, industriales y residenciales de gran escala." },
+            { icon: Trophy, title: "Red de élite", desc: "Únete al 5% superior de contratistas eléctricos en tu región." }
           ].map((feature, i) => (
             <motion.div 
               key={i}
@@ -316,6 +375,8 @@ const ProfileSetup = ({ onHelp }: { onHelp: () => void }) => {
   const [bio, setBio] = useState('');
   const [location, setLocation] = useState('');
   const [skills, setSkills] = useState('');
+  const [availability, setAvailability] = useState<'available' | 'busy' | 'offline'>('available');
+  const [yearsOfExperience, setYearsOfExperience] = useState<number>(0);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -340,6 +401,8 @@ const ProfileSetup = ({ onHelp }: { onHelp: () => void }) => {
       bio,
       location,
       skills: role === 'electrician' ? skillsArray : [],
+      availability: role === 'electrician' ? availability : undefined,
+      yearsOfExperience: role === 'electrician' ? yearsOfExperience : undefined,
       createdAt: new Date().toISOString(),
       rating: 0,
       reviewCount: 0,
@@ -375,7 +438,7 @@ const ProfileSetup = ({ onHelp }: { onHelp: () => void }) => {
             className="p-2 bg-white/5 rounded-xl text-white/40 hover:text-white transition-colors"
             title="Ayuda"
           >
-            <HelpCircle className="w-5 h-5" />
+            <CircleHelp className="w-5 h-5" />
           </button>
         </div>
 
@@ -388,6 +451,8 @@ const ProfileSetup = ({ onHelp }: { onHelp: () => void }) => {
                 setLocation('Ciudad de México, CDMX');
                 setBio('Electricista certificado con 10 años de experiencia en instalaciones industriales y residenciales.');
                 setSkills('Paneles solares, Cableado industrial, Domótica');
+                setAvailability('available');
+                setYearsOfExperience(10);
                 setAcceptedTerms(true);
               }}
               className="text-[10px] font-bold text-blue-600 uppercase tracking-widest hover:underline"
@@ -434,16 +499,43 @@ const ProfileSetup = ({ onHelp }: { onHelp: () => void }) => {
           </div>
 
           {role === 'electrician' && (
-            <div>
-              <label className="block text-xs font-bold text-white/50 uppercase tracking-widest mb-2">Habilidades (separadas por comas)</label>
-              <input 
-                type="text" 
-                value={skills}
-                onChange={(e) => setSkills(e.target.value)}
-                placeholder="ej. Paneles solares, Cableado industrial, Domótica"
-                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-600 transition-colors"
-              />
-            </div>
+            <>
+              <div>
+                <label className="block text-xs font-bold text-white/50 uppercase tracking-widest mb-2">Habilidades (separadas por comas)</label>
+                <input 
+                  type="text" 
+                  value={skills}
+                  onChange={(e) => setSkills(e.target.value)}
+                  placeholder="ej. Paneles solares, Cableado industrial, Domótica"
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-600 transition-colors"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-white/50 uppercase tracking-widest mb-2">Años de experiencia</label>
+                  <input 
+                    type="number" 
+                    min="0"
+                    value={yearsOfExperience}
+                    onChange={(e) => setYearsOfExperience(Number(e.target.value))}
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-600 transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-white/50 uppercase tracking-widest mb-2">Disponibilidad</label>
+                  <select 
+                    value={availability}
+                    onChange={(e) => setAvailability(e.target.value as any)}
+                    className="w-full px-4 py-3 bg-zinc-900 border border-white/10 rounded-xl text-white focus:outline-none focus:border-blue-600 transition-colors"
+                  >
+                    <option value="available">Disponible</option>
+                    <option value="busy">Ocupado</option>
+                    <option value="offline">Desconectado</option>
+                  </select>
+                </div>
+              </div>
+            </>
           )}
 
           <div>
@@ -584,10 +676,10 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onAccept, onComplete
       
       <div className="flex items-center gap-4 text-xs text-white/40 mb-6">
         <div className="flex items-center gap-1">
-          <MapPin className="w-3 h-3" /> {project.location}
+          <Navigation className="w-3 h-3" /> {project.location}
         </div>
         <div className="flex items-center gap-1">
-          <Clock className="w-3 h-3" /> {format(new Date(project.createdAt), 'MMM d')}
+          <Timer className="w-3 h-3" /> {format(new Date(project.createdAt), 'MMM d')}
         </div>
       </div>
 
@@ -606,7 +698,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onAccept, onComplete
             onClick={() => onChat(project)}
             className="w-full py-3 bg-white/10 text-white font-bold rounded-xl hover:bg-white/20 transition-all flex items-center justify-center gap-2"
           >
-            <MessageSquare className="w-4 h-4" /> Chat del proyecto
+            <MessageSquareText className="w-4 h-4" /> Chat del proyecto
           </button>
         )}
 
@@ -615,7 +707,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onAccept, onComplete
             onClick={() => onComplete(project.id)}
             className="w-full py-3 bg-blue-500 text-white font-bold rounded-xl hover:bg-blue-400 transition-all flex items-center justify-center gap-2"
           >
-            <CheckCircle className="w-4 h-4" /> Marcar como completado
+            <BadgeCheck className="w-4 h-4" /> Marcar como completado
           </button>
         )}
 
@@ -730,7 +822,7 @@ const ChatWindow = ({ project, currentUser, onClose }: { project: Project, curre
             ))
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-center opacity-20">
-              <MessageSquare className="w-12 h-12 mb-4" />
+              <MessageSquareText className="w-12 h-12 mb-4" />
               <p className="text-sm font-bold uppercase tracking-widest">No hay mensajes aún</p>
               <p className="text-xs mt-1">Inicia la conversación sobre el proyecto.</p>
             </div>
@@ -750,7 +842,7 @@ const ChatWindow = ({ project, currentUser, onClose }: { project: Project, curre
               disabled={!newMessage.trim() || isSending}
               className="p-3 bg-blue-600 text-white rounded-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100"
             >
-              <Send className="w-5 h-5" />
+              <SendHorizontal className="w-5 h-5" />
             </button>
           </div>
         </form>
@@ -803,7 +895,26 @@ const ElectricianProfile = ({ electrician, onClose }: { electrician: UserProfile
                 <span className="text-sm font-bold text-white/60">({electrician.reviewCount || 0} reseñas)</span>
               </div>
               <div className="flex items-center gap-2 text-sm text-white/40">
-                <MapPin className="w-4 h-4" /> {electrician.location}
+                <Navigation className="w-4 h-4" /> {electrician.location}
+              </div>
+              <div className="flex items-center gap-4 mt-2">
+                <div className="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10">
+                  <div className={cn(
+                    "w-2 h-2 rounded-full",
+                    electrician.availability === 'available' ? "bg-green-500" :
+                    electrician.availability === 'busy' ? "bg-yellow-500" : "bg-red-500"
+                  )} />
+                  <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">
+                    {electrician.availability === 'available' ? 'Disponible' :
+                     electrician.availability === 'busy' ? 'Ocupado' : 'Desconectado'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 px-3 py-1 bg-white/5 rounded-full border border-white/10">
+                  <Trophy className="w-3 h-3 text-blue-600" />
+                  <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">
+                    {electrician.yearsOfExperience || 0} Años de experiencia
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -948,7 +1059,7 @@ const ElectricianDashboard = ({ onChat, onComplete }: { onChat: (p: Project) => 
           ) : (
             <div className="col-span-full py-20 text-center bg-white/5 rounded-[3rem] border border-white/10 border-dashed flex flex-col items-center">
               <div className="w-20 h-20 bg-blue-600/10 rounded-full flex items-center justify-center mb-6">
-                <Zap className="w-10 h-10 text-blue-600/40" />
+                <PlugZap className="w-10 h-10 text-blue-600/40" />
               </div>
               <h3 className="text-2xl font-black text-white mb-2 tracking-tighter uppercase">NO HAY PROYECTOS DISPONIBLES</h3>
               <p className="text-white/40 font-medium max-w-sm mx-auto mb-8">
@@ -958,7 +1069,7 @@ const ElectricianDashboard = ({ onChat, onComplete }: { onChat: (p: Project) => 
                 onClick={() => window.location.reload()}
                 className="px-8 py-3 bg-white/5 text-white font-bold rounded-2xl border border-white/10 hover:bg-white/10 transition-all flex items-center gap-2"
               >
-                <RefreshCw className="w-4 h-4" /> Actualizar lista
+                <RotateCw className="w-4 h-4" /> Actualizar lista
               </button>
             </div>
           )
@@ -968,7 +1079,7 @@ const ElectricianDashboard = ({ onChat, onComplete }: { onChat: (p: Project) => 
           ) : (
             <div className="col-span-full py-20 text-center bg-white/5 rounded-[3rem] border border-white/10 border-dashed flex flex-col items-center">
               <div className="w-20 h-20 bg-blue-600/10 rounded-full flex items-center justify-center mb-6">
-                <Briefcase className="w-10 h-10 text-blue-600/40" />
+                <HardHat className="w-10 h-10 text-blue-600/40" />
               </div>
               <h3 className="text-2xl font-black text-white mb-2 tracking-tighter uppercase">SIN PROYECTOS ACTIVOS</h3>
               <p className="text-white/40 font-medium max-w-sm mx-auto mb-8">
@@ -1010,6 +1121,9 @@ const ClientDashboard = ({ onChat, onViewElectrician, onComplete }: { onChat: (p
   // Search state
   const [searchLocation, setSearchLocation] = useState('');
   const [searchSkill, setSearchSkill] = useState('');
+  const [searchAvailability, setSearchAvailability] = useState<'all' | 'available' | 'busy' | 'offline'>('all');
+  const [searchMinExperience, setSearchMinExperience] = useState<number>(0);
+  const [searchCertification, setSearchCertification] = useState('');
 
   const [newProject, setNewProject] = useState({
     title: '',
@@ -1055,7 +1169,13 @@ const ClientDashboard = ({ onChat, onViewElectrician, onComplete }: { onChat: (p
     const matchesSkill = searchSkill === '' || e.skills?.some(skill => 
       skill.toLowerCase().includes(searchSkill.toLowerCase())
     );
-    return matchesLocation && matchesSkill;
+    const matchesAvailability = searchAvailability === 'all' || e.availability === searchAvailability;
+    const matchesExperience = (e.yearsOfExperience || 0) >= searchMinExperience;
+    const matchesCertification = searchCertification === '' || e.certifications?.some(cert => 
+      cert.toLowerCase().includes(searchCertification.toLowerCase())
+    ) || (e.bio?.toLowerCase().includes(searchCertification.toLowerCase())); // Fallback to bio if certifications array is empty
+    
+    return matchesLocation && matchesSkill && matchesAvailability && matchesExperience && matchesCertification;
   });
 
   const handlePostProject = async (e: React.FormEvent) => {
@@ -1162,7 +1282,7 @@ const ClientDashboard = ({ onChat, onViewElectrician, onComplete }: { onChat: (p
               onClick={() => setIsPosting(true)}
               className="px-6 py-3 bg-blue-600 text-white font-black rounded-2xl hover:scale-105 transition-transform flex items-center gap-2"
             >
-              <Plus className="w-5 h-5" /> Publicar nuevo proyecto
+              <PlusCircle className="w-5 h-5" /> Publicar nuevo proyecto
             </button>
           )}
         </div>
@@ -1184,7 +1304,7 @@ const ClientDashboard = ({ onChat, onViewElectrician, onComplete }: { onChat: (p
           ) : (
             <div className="col-span-full py-20 text-center bg-white/5 rounded-[3rem] border border-white/10 border-dashed flex flex-col items-center">
               <div className="w-20 h-20 bg-blue-600/10 rounded-full flex items-center justify-center mb-6">
-                <Plus className="w-10 h-10 text-blue-600/40" />
+                <PlusCircle className="w-10 h-10 text-blue-600/40" />
               </div>
               <h3 className="text-2xl font-black text-white mb-2 tracking-tighter uppercase">SIN PROYECTOS PUBLICADOS</h3>
               <p className="text-white/40 font-medium max-w-sm mx-auto mb-8">
@@ -1194,35 +1314,72 @@ const ClientDashboard = ({ onChat, onViewElectrician, onComplete }: { onChat: (p
                 onClick={() => setIsPosting(true)}
                 className="px-8 py-4 bg-blue-600 text-white font-black rounded-2xl hover:scale-105 transition-transform flex items-center gap-2"
               >
-                <Plus className="w-5 h-5" /> Publicar mi primer proyecto
+                <PlusCircle className="w-5 h-5" /> Publicar mi primer proyecto
               </button>
             </div>
           )}
         </div>
       ) : (
         <div className="space-y-8">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="relative">
+              <Navigation className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
               <input 
                 type="text"
-                placeholder="Filtrar por ubicación..."
+                placeholder="Ubicación..."
                 value={searchLocation}
                 onChange={(e) => setSearchLocation(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white focus:border-blue-600 outline-none transition-colors"
               />
             </div>
-            <div className="relative flex-1">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+            <div className="relative">
+              <ScanSearch className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
               <select
                 value={searchSkill}
                 onChange={(e) => setSearchSkill(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white focus:border-blue-600 outline-none transition-colors appearance-none"
               >
-                <option value="" className="bg-zinc-900">Todas las habilidades</option>
+                <option value="" className="bg-zinc-900">Habilidades...</option>
                 {COMMON_SKILLS.map(skill => (
                   <option key={skill} value={skill} className="bg-zinc-900">{skill}</option>
                 ))}
+              </select>
+            </div>
+            <div className="relative">
+              <BadgeCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+              <input 
+                type="text"
+                placeholder="Certificación..."
+                value={searchCertification}
+                onChange={(e) => setSearchCertification(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white focus:border-blue-600 outline-none transition-colors"
+              />
+            </div>
+            <div className="relative">
+              <Activity className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+              <select
+                value={searchAvailability}
+                onChange={(e) => setSearchAvailability(e.target.value as any)}
+                className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white focus:border-blue-600 outline-none transition-colors appearance-none"
+              >
+                <option value="all" className="bg-zinc-900">Disponibilidad...</option>
+                <option value="available" className="bg-zinc-900">Disponible</option>
+                <option value="busy" className="bg-zinc-900">Ocupado</option>
+                <option value="offline" className="bg-zinc-900">Desconectado</option>
+              </select>
+            </div>
+            <div className="relative">
+              <Trophy className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
+              <select
+                value={searchMinExperience}
+                onChange={(e) => setSearchMinExperience(Number(e.target.value))}
+                className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white focus:border-blue-600 outline-none transition-colors appearance-none"
+              >
+                <option value="0" className="bg-zinc-900">Experiencia...</option>
+                <option value="1" className="bg-zinc-900">1+ años</option>
+                <option value="3" className="bg-zinc-900">3+ años</option>
+                <option value="5" className="bg-zinc-900">5+ años</option>
+                <option value="10" className="bg-zinc-900">10+ años</option>
               </select>
             </div>
           </div>
@@ -1237,13 +1394,22 @@ const ClientDashboard = ({ onChat, onViewElectrician, onComplete }: { onChat: (p
                   onClick={() => onViewElectrician(e)}
                 >
                   <div className="flex items-center gap-4 mb-6">
-                    <img src={e.photoURL} alt="" className="w-16 h-16 rounded-2xl object-cover border border-white/10" />
+                    <div className="relative">
+                      <img src={e.photoURL} alt="" className="w-16 h-16 rounded-2xl object-cover border border-white/10" />
+                      <div className={cn(
+                        "absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-zinc-900",
+                        e.availability === 'available' ? "bg-green-500" :
+                        e.availability === 'busy' ? "bg-yellow-500" : "bg-red-500"
+                      )} />
+                    </div>
                     <div>
                       <h3 className="text-xl font-bold text-white group-hover:text-blue-600 transition-colors">{e.displayName}</h3>
-                      <div className="flex items-center gap-1 text-blue-600">
-                        <Star className="w-3 h-3 fill-blue-600" />
-                        <span className="text-sm font-bold">{e.rating?.toFixed(1) || 'N/A'}</span>
-                        <span className="text-xs text-white/30 ml-1">({e.reviewCount || 0})</span>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1 text-blue-600">
+                          <Star className="w-3 h-3 fill-blue-600" />
+                          <span className="text-sm font-bold">{e.rating?.toFixed(1) || 'N/A'}</span>
+                        </div>
+                        <span className="text-[10px] font-black text-white/30 uppercase tracking-widest">{e.yearsOfExperience || 0} años exp.</span>
                       </div>
                     </div>
                   </div>
@@ -1264,7 +1430,7 @@ const ClientDashboard = ({ onChat, onViewElectrician, onComplete }: { onChat: (p
                   <p className="text-white/50 text-sm line-clamp-2 mb-6">{e.bio}</p>
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-white/30 flex items-center gap-1">
-                      <MapPin className="w-3 h-3" /> {e.location}
+                      <Navigation className="w-3 h-3" /> {e.location}
                     </span>
                     <span className="text-xs font-bold text-blue-600 flex items-center gap-1">
                       Ver perfil <ChevronRight className="w-3 h-3" />
@@ -1275,10 +1441,16 @@ const ClientDashboard = ({ onChat, onViewElectrician, onComplete }: { onChat: (p
             </div>
           ) : (
             <div className="py-20 text-center bg-white/5 rounded-[2rem] border border-white/10 border-dashed">
-              <Search className="w-12 h-12 text-white/10 mx-auto mb-4" />
+              <ScanSearch className="w-12 h-12 text-white/10 mx-auto mb-4" />
               <p className="text-white/40 font-bold">No se encontraron electricistas con esos criterios.</p>
               <button 
-                onClick={() => { setSearchLocation(''); setSearchSkill(''); }}
+                onClick={() => { 
+                  setSearchLocation(''); 
+                  setSearchSkill(''); 
+                  setSearchAvailability('all');
+                  setSearchMinExperience(0);
+                  setSearchCertification('');
+                }}
                 className="mt-4 text-blue-600 text-sm font-bold hover:underline"
               >
                 Limpiar filtros
@@ -1459,7 +1631,7 @@ const Footer = () => (
         <div className="col-span-2">
           <div className="flex items-center gap-2 mb-6">
             <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <Zap className="w-5 h-5 text-white fill-white" />
+              <PlugZap className="w-5 h-5 text-white fill-white" />
             </div>
             <span className="text-xl font-bold tracking-tighter text-white">ElectriApp</span>
           </div>
@@ -1488,8 +1660,8 @@ const Footer = () => (
       <div className="pt-8 border-t border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
         <p className="text-xs text-white/20">© 2026 ElectriApp. Todos los derechos reservados.</p>
         <div className="flex gap-6">
-          <a href="#" className="text-white/20 hover:text-white transition-colors"><Zap className="w-4 h-4" /></a>
-          <a href="#" className="text-white/20 hover:text-white transition-colors"><Zap className="w-4 h-4" /></a>
+          <a href="#" className="text-white/20 hover:text-white transition-colors"><PlugZap className="w-4 h-4" /></a>
+          <a href="#" className="text-white/20 hover:text-white transition-colors"><PlugZap className="w-4 h-4" /></a>
         </div>
       </div>
     </div>
@@ -1501,6 +1673,7 @@ const AppContent = () => {
   const [viewingElectrician, setViewingElectrician] = useState<UserProfile | null>(null);
   const [chatProject, setChatProject] = useState<Project | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
 
   const handleCompleteProject = async (projectId: string) => {
     try {
@@ -1541,14 +1714,6 @@ const AppContent = () => {
     }
   };
 
-  const handleLogin = async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error) {
-      console.error("Login failed:", error);
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -1560,10 +1725,11 @@ const AppContent = () => {
   if (!user) {
     return (
       <div className="min-h-screen bg-black">
-        <Navbar onHelp={() => setShowHelp(true)} />
-        <Hero onLogin={handleLogin} />
+        <Navbar onHelp={() => setShowHelp(true)} onLogin={() => setShowLogin(true)} />
+        <Hero onLogin={() => setShowLogin(true)} />
         <AnimatePresence>
           {showHelp && <HelpCenter onClose={() => setShowHelp(false)} />}
+          {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
         </AnimatePresence>
       </div>
     );
@@ -1582,7 +1748,7 @@ const AppContent = () => {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <Navbar onHelp={() => setShowHelp(true)} />
+      <Navbar onHelp={() => setShowHelp(true)} onLogin={() => setShowLogin(true)} />
       
       {profile.role === 'electrician' ? (
         <ElectricianDashboard onChat={(p) => setChatProject(p)} onComplete={handleCompleteProject} />
@@ -1598,6 +1764,7 @@ const AppContent = () => {
 
       <AnimatePresence>
         {showHelp && <HelpCenter onClose={() => setShowHelp(false)} />}
+        {showLogin && <LoginModal onClose={() => setShowLogin(false)} />}
         {viewingElectrician && (
           <ElectricianProfile 
             electrician={viewingElectrician} 

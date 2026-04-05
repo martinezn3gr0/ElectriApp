@@ -9,6 +9,8 @@ export interface UserProfile {
   bio?: string;
   skills?: string[];
   certifications?: string[];
+  availability?: 'available' | 'busy' | 'offline';
+  yearsOfExperience?: number;
   location?: string;
   rating?: number;
   reviewCount?: number;

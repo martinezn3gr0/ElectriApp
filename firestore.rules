@@ -146,6 +146,12 @@ service cloud.firestore {
     // Rules
     // ===============================================================
 
+    function ratingFieldsUnchanged() {
+      // rating / reviewCount are written only by Admin SDK / Cloud Functions
+      return request.resource.data.get('rating', 0) == resource.data.get('rating', 0)
+        && request.resource.data.get('reviewCount', 0) == resource.data.get('reviewCount', 0);
+    }
+
     match /users/{uid} {
       // Users can read their own profile. 
       // Public profiles: Only non-sensitive data should be public.
@@ -154,7 +160,7 @@ service cloud.firestore {
       // Let's split the data or just limit read to owner for now.
       allow read: if isAuthenticated(); 
       allow create: if isOwner(uid) && isValidUser(request.resource.data);
-      allow update: if isOwner(uid) && isValidUser(request.resource.data) && uidNotModified();
+      allow update: if isOwner(uid) && isValidUser(request.resource.data) && uidNotModified() && ratingFieldsUnchanged();
     }
 
     match /projects/{projectId} {
@@ -173,7 +179,9 @@ service cloud.firestore {
 
     match /reviews/{reviewId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.clientId && isValidReview(request.resource.data);
+      // Creates go through Admin SDK (/api/submit-review) or Cloud Functions —
+      // clients must not write reviews (and never touch electrician ratings).
+      allow create: if false;
       // Reviews are typically immutable once posted
       allow update: if false;
       allow delete: if isAdmin();

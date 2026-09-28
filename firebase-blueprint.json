@@ -1,8 +1,8 @@
 {
   "entities": {
     "User": {
-      "title": "User Profile",
-      "description": "Information about electricians and clients.",
+      "title": "User Profile (private)",
+      "description": "Private profile including email. Owner-only reads.",
       "type": "object",
       "properties": {
         "uid": { "type": "string", "description": "Firebase Auth UID" },
@@ -24,6 +24,27 @@
       },
       "required": ["uid", "email", "role", "acceptedTerms", "acceptedAt"]
     },
+    "PublicProfile": {
+      "title": "Public Profile",
+      "description": "Marketplace card without email or terms fields.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["electrician", "client"] },
+        "bio": { "type": "string" },
+        "skills": { "type": "array", "items": { "type": "string" } },
+        "certifications": { "type": "array", "items": { "type": "string" } },
+        "availability": { "type": "string", "enum": ["available", "busy", "offline"] },
+        "yearsOfExperience": { "type": "integer" },
+        "location": { "type": "string" },
+        "rating": { "type": "number" },
+        "reviewCount": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "displayName", "role", "createdAt"]
+    },
     "Project": {
       "title": "Project Lead",
       "description": "A job opportunity posted by a client.",
@@ -44,7 +65,7 @@
     },
     "Review": {
       "title": "Review",
-      "description": "Client feedback for an electrician.",
+      "description": "Client feedback for an electrician. Written only via Admin SDK.",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
@@ -53,13 +74,14 @@
         "electricianId": { "type": "string" },
         "rating": { "type": "number" },
         "comment": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "ratingApplied": { "type": "boolean" }
       },
       "required": ["projectId", "clientId", "electricianId", "rating"]
     },
     "Message": {
       "title": "Chat Message",
-      "description": "Communication between client and electrician.",
+      "description": "Communication between client and electrician on a project.",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
@@ -75,7 +97,11 @@
   "firestore": {
     "/users/{uid}": {
       "schema": "User",
-      "description": "User profiles"
+      "description": "Private user profiles (PII)"
+    },
+    "/publicProfiles/{uid}": {
+      "schema": "PublicProfile",
+      "description": "Public marketplace profiles (no email)"
     },
     "/projects/{projectId}": {
       "schema": "Project",

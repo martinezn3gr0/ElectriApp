@@ -14,7 +14,7 @@ import {
 import { collection, query, where, orderBy, onSnapshot, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth, handleFirestoreError, OperationType } from './FirebaseProvider';
-import { Project, ProjectCategory, UserProfile } from '../types';
+import { Project, ProjectCategory, PublicProfile } from '../types';
 import { ProjectCard } from './ProjectCard';
 import { COMMON_SKILLS } from '../constants';
 import { apiFetch } from '../lib/api';
@@ -27,13 +27,13 @@ export const ClientDashboard = ({
   initialTab = 'projects',
 }: {
   onChat: (p: Project) => void;
-  onViewElectrician: (e: UserProfile) => void;
+  onViewElectrician: (e: PublicProfile) => void;
   onComplete: (projectId: string) => void;
   initialTab?: 'projects' | 'search';
 }) => {
   const { user } = useAuth();
   const [myProjects, setMyProjects] = useState<Project[]>([]);
-  const [electricians, setElectricians] = useState<UserProfile[]>([]);
+  const [electricians, setElectricians] = useState<PublicProfile[]>([]);
   const [activeTab, setActiveTab] = useState<'projects' | 'search'>(initialTab);
   const [isPosting, setIsPosting] = useState(false);
 
@@ -77,13 +77,16 @@ export const ClientDashboard = ({
       (err) => handleFirestoreError(err, OperationType.LIST, 'projects')
     );
 
-    const qElectricians = query(collection(db, 'users'), where('role', '==', 'electrician'));
+    const qElectricians = query(
+      collection(db, 'publicProfiles'),
+      where('role', '==', 'electrician')
+    );
     const unsubElectricians = onSnapshot(
       qElectricians,
       (snap) => {
-        setElectricians(snap.docs.map((d) => d.data() as UserProfile));
+        setElectricians(snap.docs.map((d) => d.data() as PublicProfile));
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'users')
+      (err) => handleFirestoreError(err, OperationType.LIST, 'publicProfiles')
     );
 
     return () => {

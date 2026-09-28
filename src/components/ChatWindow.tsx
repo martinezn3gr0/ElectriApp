@@ -48,16 +48,27 @@ export const ChatWindow = ({
     e.preventDefault();
     if (!newMessage.trim() || isSending) return;
 
+    const isParty =
+      currentUser.uid === project.clientId || currentUser.uid === project.electricianId;
+    if (!isParty || project.status === 'open' || project.status === 'cancelled') {
+      handleFirestoreError(
+        new Error('No tienes permiso para chatear en este proyecto'),
+        OperationType.CREATE,
+        'messages'
+      );
+      return;
+    }
+
     setIsSending(true);
     try {
-      const receiverId = currentUser.role === 'client' ? project.electricianId : project.clientId;
+      const receiverId = currentUser.uid === project.clientId ? project.electricianId : project.clientId;
       if (!receiverId) throw new Error('No receiver found');
 
       await addDoc(collection(db, 'messages'), {
         projectId: project.id,
         senderId: currentUser.uid,
         receiverId,
-        text: newMessage.trim(),
+        text: newMessage.trim().slice(0, 4999),
         createdAt: new Date().toISOString(),
       });
       setNewMessage('');

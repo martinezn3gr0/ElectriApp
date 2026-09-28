@@ -12,14 +12,14 @@ import { ClientDashboard } from '../components/ClientDashboard';
 import { ElectricianProfile } from '../components/ElectricianProfile';
 import { ChatWindow } from '../components/ChatWindow';
 import { useCompleteProject } from '../hooks/useCompleteProject';
-import { Project, UserProfile } from '../types';
+import { Project, PublicProfile } from '../types';
 
 export default function DashboardPage() {
   const { user, profile, loading } = useAuth();
   const location = useLocation();
   const handleCompleteProject = useCompleteProject();
 
-  const [viewingElectrician, setViewingElectrician] = useState<UserProfile | null>(null);
+  const [viewingElectrician, setViewingElectrician] = useState<PublicProfile | null>(null);
   const [chatProject, setChatProject] = useState<Project | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [showLogin, setShowLogin] = useState(false);

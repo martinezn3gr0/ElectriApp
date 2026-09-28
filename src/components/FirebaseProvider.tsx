@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc, setDoc, onSnapshot, getDocFromServer } from 'firebase/firestore';
+import { doc, getDoc, getDocFromServer } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { UserProfile } from '../types';
 
@@ -61,8 +61,9 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     operationType,
     path
   }
+  // Log detailed diagnostics for developers; never surface auth PII to the UI.
   console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  throw new Error(`No se pudo completar la operación (${operationType}${path ? `: ${path}` : ''}).`);
 }
 
 export class ErrorBoundary extends React.Component<any, any> {
@@ -75,7 +76,7 @@ export class ErrorBoundary extends React.Component<any, any> {
   }
 
   static getDerivedStateFromError(error: any) {
-    return { hasError: true, errorInfo: error.message };
+    return { hasError: true, errorInfo: error?.message || 'Error desconocido' };
   }
 
   componentDidCatch(error: any, errorInfo: React.ErrorInfo) {
@@ -84,22 +85,12 @@ export class ErrorBoundary extends React.Component<any, any> {
 
   render() {
     if (this.state.hasError) {
-      let displayError = "Algo salió mal.";
-      try {
-        const parsed = JSON.parse(this.state.errorInfo || "");
-        if (parsed.error) {
-          displayError = `Error de Firestore (${parsed.operationType}): ${parsed.error}`;
-        }
-      } catch (e) {
-        displayError = this.state.errorInfo || "Error desconocido";
-      }
-
       return (
         <div className="min-h-screen bg-black flex items-center justify-center p-8 text-center">
           <div className="max-w-md p-8 bg-white/5 border border-white/10 rounded-3xl backdrop-blur-xl">
             <h2 className="text-2xl font-black text-white mb-4 tracking-tighter">¡UPS! ALGO FALLÓ</h2>
             <p className="text-white/60 mb-6 text-sm leading-relaxed">
-              {displayError}
+              Algo salió mal. Intenta de nuevo. Si el problema continúa, contacta soporte.
             </p>
             <button 
               onClick={() => window.location.reload()}

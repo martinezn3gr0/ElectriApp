@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { CircleHelp, X } from 'lucide-react';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth, handleFirestoreError, OperationType } from './FirebaseProvider';
 import { UserProfile, UserRole } from '../types';
+import { toPublicProfile } from '../lib/publicProfile';
 import { cn } from '../lib/utils';
 
 export const ProfileSetup = ({ onHelp }: { onHelp: () => void }) => {
@@ -43,7 +44,7 @@ export const ProfileSetup = ({ onHelp }: { onHelp: () => void }) => {
       skills: role === 'electrician' ? skillsArray : [],
       certifications: role === 'electrician' ? certificationsArray : [],
       availability: role === 'electrician' ? availability : undefined,
-      yearsOfExperience: role === 'electrician' ? yearsOfExperience : undefined,
+      yearsOfExperience: role === 'electrician' ? Math.max(0, Math.trunc(yearsOfExperience)) : undefined,
       createdAt: new Date().toISOString(),
       rating: 0,
       reviewCount: 0,
@@ -52,7 +53,10 @@ export const ProfileSetup = ({ onHelp }: { onHelp: () => void }) => {
     };
 
     try {
-      await setDoc(doc(db, 'users', user.uid), newProfile);
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'users', user.uid), newProfile);
+      batch.set(doc(db, 'publicProfiles', user.uid), toPublicProfile(newProfile));
+      await batch.commit();
       setProfile(newProfile);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `users/${user.uid}`);
@@ -84,24 +88,26 @@ export const ProfileSetup = ({ onHelp }: { onHelp: () => void }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={() => {
-                setRole('electrician');
-                setLocation('Ciudad de México, CDMX');
-                setBio('Electricista certificado con 10 años de experiencia en instalaciones industriales y residenciales.');
-                setSkills('Paneles solares, Cableado industrial, Domótica');
-                setCertifications('NOM-001-SEDE, Licencia municipal CDMX');
-                setAvailability('available');
-                setYearsOfExperience(10);
-                setAcceptedTerms(true);
-              }}
-              className="text-[10px] font-bold text-blue-600 uppercase tracking-widest hover:underline"
-            >
-              Llenar con datos de prueba
-            </button>
-          </div>
+          {import.meta.env.DEV && (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setRole('electrician');
+                  setLocation('Ciudad de México, CDMX');
+                  setBio('Electricista certificado con 10 años de experiencia en instalaciones industriales y residenciales.');
+                  setSkills('Paneles solares, Cableado industrial, Domótica');
+                  setCertifications('NOM-001-SEDE, Licencia municipal CDMX');
+                  setAvailability('available');
+                  setYearsOfExperience(10);
+                  setAcceptedTerms(true);
+                }}
+                className="text-[10px] font-bold text-blue-600 uppercase tracking-widest hover:underline"
+              >
+                Llenar con datos de prueba
+              </button>
+            </div>
+          )}
           <div>
             <label className="block text-xs font-bold text-white/50 uppercase tracking-widest mb-2">Soy un...</label>
             <div className="grid grid-cols-2 gap-4">

@@ -5,14 +5,14 @@ import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestor
 import { format } from 'date-fns';
 import { db } from '../firebase';
 import { handleFirestoreError, OperationType } from './FirebaseProvider';
-import { Review, UserProfile } from '../types';
+import { Review, PublicProfile } from '../types';
 import { cn } from '../lib/utils';
 
 export const ElectricianProfile = ({
   electrician,
   onClose,
 }: {
-  electrician: UserProfile;
+  electrician: PublicProfile;
   onClose: () => void;
 }) => {
   const [reviews, setReviews] = useState<Review[]>([]);

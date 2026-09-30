@@ -80,6 +80,17 @@ firebase deploy --only functions
 - `npm start` — server producción (sirve `dist/`)
 - `npm run lint` — TypeScript check
 - `npm test` — tests unitarios (sanitización)
+- `npm run backfill:public-profiles` — sincroniza `publicProfiles` desde `users` (usa Admin SDK)
+- `npm run deploy:checklist` — lint + test + build + `firebase deploy` (si hay CLI)
+
+### Backfill de perfiles públicos
+
+Tras desplegar las rules nuevas, usuarios viejos pueden no tener `publicProfiles`:
+
+```bash
+FIREBASE_SERVICE_ACCOUNT_JSON='...' npx tsx scripts/backfill-public-profiles.ts --dry-run
+FIREBASE_SERVICE_ACCOUNT_JSON='...' npm run backfill:public-profiles
+```
 
 ## API
 

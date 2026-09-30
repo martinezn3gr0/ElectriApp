@@ -2,56 +2,15 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // ===============================================================
-    // Assumed Data Model
+    // ElectriApp production rules
     // ===============================================================
-    //
-    // Collection: users
-    // Document ID: {uid}
-    // Fields:
-    //   - uid: string (required) - Firebase Auth UID
-    //   - displayName: string (required)
-    //   - email: string (required, format: email)
-    //   - photoURL: string (required, format: uri)
-    //   - role: string (required, enum: ["electrician", "client"])
-    //   - bio: string (optional)
-    //   - skills: list (optional)
-    //   - certifications: list (optional)
-    //   - location: string (optional)
-    //   - rating: number (optional)
-    //   - reviewCount: number (optional)
-    //   - createdAt: string (required, format: date-time)
-    //
-    // Collection: projects
-    // Document ID: {projectId}
-    // Fields:
-    //   - id: string (required)
-    //   - title: string (required)
-    //   - description: string (required)
-    //   - budget: number (required)
-    //   - location: string (required)
-    //   - status: string (required, enum: ["open", "in-progress", "completed", "cancelled"])
-    //   - clientId: string (required) - UID of the client who posted
-    //   - electricianId: string (optional) - UID of the electrician assigned
-    //   - category: string (required, enum: ["residential", "commercial", "industrial", "emergency"])
-    //   - createdAt: string (required, format: date-time)
-    //
-    // Collection: reviews
-    // Document ID: {reviewId}
-    // Fields:
-    //   - id: string (required)
-    //   - projectId: string (required)
-    //   - clientId: string (required)
-    //   - electricianId: string (required)
-    //   - rating: number (required, range: 1-5)
-    //   - comment: string (required)
-    //   - createdAt: string (required, format: date-time)
-    //
+    // users/{uid}           — private profile (includes email); owner read/write
+    // publicProfiles/{uid}  — public marketplace card (NO email)
+    // projects/{projectId}  — job listings
+    // reviews/{reviewId}    — created only via Admin SDK
+    // messages/{messageId}  — project parties only
     // ===============================================================
 
-    // ===============================================================
-    // Helper Functions
-    // ===============================================================
-    
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -60,16 +19,8 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    function isDocOwner() {
-      return isAuthenticated() && request.auth.uid == resource.data.uid;
-    }
-
-    function uidUnchanged() {
-      return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid;
-    }
-
     function uidNotModified() {
-      return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
+      return request.resource.data.uid == resource.data.uid;
     }
 
     function hasRequiredFields(fields) {
@@ -81,111 +32,237 @@ service cloud.firestore {
     }
 
     function isValidEmail(email) {
-      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
-    }
-
-    function isValidUrl(url) {
-      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+      return email is string && email.matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$');
     }
 
     function isValidDateString(dateStr) {
-      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+      return dateStr is string && dateStr.matches('^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$');
     }
 
+    // Admin only via Firebase custom claims: { "admin": true }
     function isAdmin() {
-      return isAuthenticated() && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-         (request.auth.token.email == "martinezn3gr0o@gmail.com" && request.auth.token.email_verified == true));
+      return isAuthenticated() && request.auth.token.admin == true;
     }
 
-    // ===============================================================
-    // Domain Validators
-    // ===============================================================
+    function isValidRole(role) {
+      return role in ['electrician', 'client'];
+    }
 
     function isValidUser(data) {
       return hasRequiredFields(['uid', 'displayName', 'email', 'role', 'createdAt', 'acceptedTerms', 'acceptedAt']) &&
              data.uid is string && data.uid.size() > 0 &&
+             data.uid == request.auth.uid &&
              data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 100 &&
              isValidEmail(data.email) &&
-             data.role in ['electrician', 'client'] &&
+             isValidRole(data.role) &&
+             (!('photoURL' in data) || data.photoURL is string) &&
+             (!('bio' in data) || (data.bio is string && data.bio.size() < 2000)) &&
+             (!('skills' in data) || data.skills is list) &&
+             (!('certifications' in data) || data.certifications is list) &&
              (!('availability' in data) || data.availability in ['available', 'busy', 'offline']) &&
-             (!('yearsOfExperience' in data) || (data.yearsOfExperience is int && data.yearsOfExperience >= 0)) &&
+             (!('yearsOfExperience' in data) || (data.yearsOfExperience is int && data.yearsOfExperience >= 0 && data.yearsOfExperience <= 80)) &&
+             (!('location' in data) || (data.location is string && data.location.size() < 200)) &&
+             (!('rating' in data) || (data.rating is number && data.rating >= 0 && data.rating <= 5)) &&
+             (!('reviewCount' in data) || (data.reviewCount is int && data.reviewCount >= 0)) &&
              isValidDateString(data.createdAt) &&
              data.acceptedTerms == true &&
              isValidDateString(data.acceptedAt);
+    }
+
+    function ratingFieldsUnchanged() {
+      return request.resource.data.get('rating', 0) == resource.data.get('rating', 0)
+        && request.resource.data.get('reviewCount', 0) == resource.data.get('reviewCount', 0);
+    }
+
+    function immutableIdentityFields() {
+      return request.resource.data.role == resource.data.role
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.acceptedTerms == resource.data.acceptedTerms
+        && request.resource.data.acceptedAt == resource.data.acceptedAt;
+    }
+
+    function publicProfileAllowedKeys() {
+      return [
+        'uid', 'displayName', 'photoURL', 'role', 'bio', 'skills',
+        'certifications', 'availability', 'yearsOfExperience', 'location',
+        'rating', 'reviewCount', 'createdAt'
+      ];
+    }
+
+    function isValidPublicProfile(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'role', 'createdAt']) &&
+             data.keys().hasOnly(publicProfileAllowedKeys()) &&
+             !('email' in data) &&
+             !('acceptedTerms' in data) &&
+             data.uid == request.auth.uid &&
+             data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 100 &&
+             isValidRole(data.role) &&
+             (!('photoURL' in data) || data.photoURL is string) &&
+             (!('bio' in data) || (data.bio is string && data.bio.size() < 2000)) &&
+             (!('skills' in data) || data.skills is list) &&
+             (!('certifications' in data) || data.certifications is list) &&
+             (!('availability' in data) || data.availability in ['available', 'busy', 'offline']) &&
+             (!('yearsOfExperience' in data) || (data.yearsOfExperience is int && data.yearsOfExperience >= 0 && data.yearsOfExperience <= 80)) &&
+             (!('location' in data) || (data.location is string && data.location.size() < 200)) &&
+             (!('rating' in data) || (data.rating is number && data.rating >= 0 && data.rating <= 5)) &&
+             (!('reviewCount' in data) || (data.reviewCount is int && data.reviewCount >= 0)) &&
+             isValidDateString(data.createdAt);
     }
 
     function isValidProject(data) {
       return hasRequiredFields(['title', 'description', 'budget', 'location', 'status', 'clientId', 'category', 'createdAt']) &&
              data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
              data.description is string && data.description.size() > 0 && data.description.size() < 5000 &&
-             data.budget is number && data.budget >= 0 &&
-             data.location is string && data.location.size() > 0 &&
+             data.budget is number && data.budget >= 0 && data.budget <= 10000000 &&
+             data.location is string && data.location.size() > 0 && data.location.size() < 200 &&
              data.status in ['open', 'in-progress', 'completed', 'cancelled'] &&
              data.category in ['residential', 'commercial', 'industrial', 'emergency'] &&
+             data.clientId is string &&
+             (!('electricianId' in data) || data.electricianId is string) &&
              isValidDateString(data.createdAt);
     }
 
-    function isValidReview(data) {
-      return hasRequiredFields(['projectId', 'clientId', 'electricianId', 'rating', 'comment', 'createdAt']) &&
-             data.rating is number && data.rating >= 1 && data.rating <= 5 &&
-             data.comment is string && data.comment.size() > 0 && data.comment.size() < 2000 &&
-             isValidDateString(data.createdAt);
+    function projectCoreUnchanged() {
+      return request.resource.data.clientId == resource.data.clientId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.title == resource.data.title
+        && request.resource.data.description == resource.data.description
+        && request.resource.data.budget == resource.data.budget
+        && request.resource.data.location == resource.data.location
+        && request.resource.data.category == resource.data.category;
+    }
+
+    function projectAssignmentUnchanged() {
+      return request.resource.data.get('electricianId', '') == resource.data.get('electricianId', '');
+    }
+
+    function getProject(projectId) {
+      return get(/databases/$(database)/documents/projects/$(projectId)).data;
+    }
+
+    function isProjectParty(projectId) {
+      let p = getProject(projectId);
+      return isAuthenticated() && (
+        request.auth.uid == p.clientId ||
+        ('electricianId' in p && request.auth.uid == p.electricianId)
+      );
     }
 
     function isValidMessage(data) {
       return hasRequiredFields(['projectId', 'senderId', 'receiverId', 'text', 'createdAt']) &&
              data.projectId is string &&
-             data.senderId is string &&
-             data.receiverId is string &&
+             data.senderId == request.auth.uid &&
+             data.receiverId is string && data.receiverId.size() > 0 &&
+             data.receiverId != data.senderId &&
              data.text is string && data.text.size() > 0 && data.text.size() < 5000 &&
              isValidDateString(data.createdAt);
     }
 
-    // ===============================================================
-    // Rules
-    // ===============================================================
-
-    match /users/{uid} {
-      // Users can read their own profile. 
-      // Public profiles: Only non-sensitive data should be public.
-      // For simplicity in this prototype, we'll allow reading any profile but we'll be careful with PII.
-      // Guidelines say: "If a collection contains ANY PII, you MUST strictly limit read access to the document owner only."
-      // Let's split the data or just limit read to owner for now.
-      allow read: if isAuthenticated(); 
-      allow create: if isOwner(uid) && isValidUser(request.resource.data);
-      allow update: if isOwner(uid) && isValidUser(request.resource.data) && uidNotModified();
+    function messageReceiverIsOtherParty(data) {
+      let p = getProject(data.projectId);
+      return (request.auth.uid == p.clientId && data.receiverId == p.electricianId) ||
+             (request.auth.uid == p.electricianId && data.receiverId == p.clientId);
     }
 
+    // -------------------- users (private, includes email) --------------------
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid)
+                    && isValidUser(request.resource.data)
+                    && request.resource.data.get('rating', 0) == 0
+                    && request.resource.data.get('reviewCount', 0) == 0;
+      allow update: if isOwner(uid)
+                    && isValidUser(request.resource.data)
+                    && uidNotModified()
+                    && ratingFieldsUnchanged()
+                    && immutableIdentityFields();
+      allow delete: if false;
+    }
+
+    // -------------------- publicProfiles (no PII / no email) --------------------
+    match /publicProfiles/{uid} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(uid)
+                    && isValidPublicProfile(request.resource.data)
+                    && request.resource.data.get('rating', 0) == 0
+                    && request.resource.data.get('reviewCount', 0) == 0;
+      allow update: if isOwner(uid)
+                    && isValidPublicProfile(request.resource.data)
+                    && request.resource.data.uid == resource.data.uid
+                    && request.resource.data.role == resource.data.role
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && ratingFieldsUnchanged();
+      allow delete: if false;
+    }
+
+    // -------------------- projects --------------------
     match /projects/{projectId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.clientId && isValidProject(request.resource.data);
-      allow update: if isAuthenticated() && (
-        // Client can update their own project
-        (request.auth.uid == resource.data.clientId && isValidProject(request.resource.data) && request.resource.data.clientId == resource.data.clientId) ||
-        // Electrician can accept a project (update status and electricianId)
-        (resource.data.status == 'open' && request.resource.data.status == 'in-progress' && request.resource.data.electricianId == request.auth.uid) ||
-        // Assigned electrician can mark as completed
-        (resource.data.electricianId == request.auth.uid && request.resource.data.status == 'completed' && isValidProject(request.resource.data))
+
+      allow create: if isAuthenticated()
+                    && request.auth.uid == request.resource.data.clientId
+                    && request.resource.data.status == 'open'
+                    && !('electricianId' in request.resource.data)
+                    && isValidProject(request.resource.data);
+
+      allow update: if isAuthenticated() && isValidProject(request.resource.data) && (
+        // Client edits / cancels while still open
+        (
+          request.auth.uid == resource.data.clientId
+          && resource.data.status == 'open'
+          && request.resource.data.status in ['open', 'cancelled']
+          && request.resource.data.clientId == resource.data.clientId
+          && !('electricianId' in request.resource.data)
+        )
+        ||
+        // Electrician accepts an open project
+        (
+          resource.data.status == 'open'
+          && request.resource.data.status == 'in-progress'
+          && request.resource.data.electricianId == request.auth.uid
+          && projectCoreUnchanged()
+        )
+        ||
+        // Client or assigned electrician marks completed
+        (
+          resource.data.status == 'in-progress'
+          && request.resource.data.status == 'completed'
+          && (
+            request.auth.uid == resource.data.clientId ||
+            request.auth.uid == resource.data.electricianId
+          )
+          && projectCoreUnchanged()
+          && projectAssignmentUnchanged()
+        )
       );
-      allow delete: if isAuthenticated() && request.auth.uid == resource.data.clientId && resource.data.status == 'open';
+
+      allow delete: if isAuthenticated()
+                    && request.auth.uid == resource.data.clientId
+                    && resource.data.status == 'open';
     }
 
+    // -------------------- reviews (Admin SDK only for writes) --------------------
     match /reviews/{reviewId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.clientId && isValidReview(request.resource.data);
-      // Reviews are typically immutable once posted
-      allow update: if false;
+      allow create, update: if false;
       allow delete: if isAdmin();
     }
 
+    // -------------------- messages (project parties only) --------------------
     match /messages/{messageId} {
-      allow read: if isAuthenticated() && (request.auth.uid == resource.data.senderId || request.auth.uid == resource.data.receiverId);
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.senderId && isValidMessage(request.resource.data);
+      allow read: if isAuthenticated()
+                  && (request.auth.uid == resource.data.senderId
+                      || request.auth.uid == resource.data.receiverId);
+
+      allow create: if isAuthenticated()
+                    && isValidMessage(request.resource.data)
+                    && isProjectParty(request.resource.data.projectId)
+                    && messageReceiverIsOtherParty(request.resource.data);
+
       allow update, delete: if false;
     }
 
-    // Default deny
     match /{path=**} {
       allow read, write: if false;
     }

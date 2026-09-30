@@ -1,5 +1,6 @@
 export type UserRole = 'electrician' | 'client';
 
+/** Private profile (users/{uid}) — includes email; owner-only reads. */
 export interface UserProfile {
   uid: string;
   displayName: string;
@@ -17,6 +18,23 @@ export interface UserProfile {
   createdAt: string;
   acceptedTerms: boolean;
   acceptedAt: string;
+}
+
+/** Public marketplace card (publicProfiles/{uid}) — never includes email. */
+export interface PublicProfile {
+  uid: string;
+  displayName: string;
+  photoURL: string;
+  role: UserRole;
+  bio?: string;
+  skills?: string[];
+  certifications?: string[];
+  availability?: 'available' | 'busy' | 'offline';
+  yearsOfExperience?: number;
+  location?: string;
+  rating?: number;
+  reviewCount?: number;
+  createdAt: string;
 }
 
 export type ProjectStatus = 'open' | 'in-progress' | 'completed' | 'cancelled';
